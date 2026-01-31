@@ -9,7 +9,9 @@ dependencies:
   flutter:
     sdk: flutter
   shared_preferences: ^2.2.2
-  google_maps_flutter: ^2.5.3
+  google_maps_flutter: ^2.14.0
+  pedometer: ^4.0.1
+  permission_handler: ^11.0.1
 
 dev_dependencies:
   flutter_test:
