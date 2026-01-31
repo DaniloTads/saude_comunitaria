@@ -1,16 +1,32 @@
-# projetos
+# Saúde Comunitária 🏥🏃‍♂️
 
-A new Flutter project.
+Este projeto é um aplicativo mobile desenvolvido em **Flutter** como parte de um **trabalho extensionista** focado em Tecnologia em Análise e Desenvolvimento de Sistemas. O objetivo é promover o bem-estar e a saúde através do monitoramento de atividades físicas e integração comunitária.
 
-## Getting Started
+## 🚀 Funcionalidades
 
-This project is a starting point for a Flutter application.
+* **Cadastro de Usuário**: Coleta de dados básicos (nome, idade, cidade e bairro) armazenados localmente para personalização da experiência.
+* **SplashScreen**: Lógica de redirecionamento inteligente que verifica se o usuário já possui cadastro.
+* **Dashboard de Saúde**: Menu intuitivo com acesso a mapas, metas de caminhada, estatísticas e ranking.
+* **Integração com Mapas**: Estrutura pronta para visualização de parques e traçado de rotas (Google Maps).
+* **Gerenciamento de Estado**: Uso de controladores para garantir a fluidez da interface e economia de memória.
 
-A few resources to get you started if this is your first Flutter project:
+## 🛠️ Tecnologias Utilizadas
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+* **Linguagem**: Dart
+* **Framework**: Flutter
+* **Persistência de Dados**: SharedPreferences (armazenamento local)
+* **Mapas**: Google Maps Flutter SDK
+* **Versionamento**: Git & GitHub
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## 📦 Como executar o projeto
+
+1. Certifique-se de ter o Flutter instalado e configurado (SDK >= 3.10.0).
+2. Clone o repositório:
+   `git clone https://github.com/DaniloTads/saude_comunitaria.git`
+3. Instale as dependências:
+   `flutter pub get`
+4. Execute o app:
+   `flutter run`
+
+---
+*Desenvolvido por Danilo - TADS*
