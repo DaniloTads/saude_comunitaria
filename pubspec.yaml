@@ -1,0 +1,6 @@
+dependencies:
+  flutter:
+    sdk: flutter
+  shared_preferences: ^2.2.2
+  google_maps_flutter: ^2.5.3
+  geolocator: ^10.1.0
