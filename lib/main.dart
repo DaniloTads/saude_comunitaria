@@ -1,14 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'dart:io';
+import 'dart:convert';
 
 void main() => runApp(MaterialApp(
   home: SplashScreen(),
-  debugShowCheckedModeBanner: false, // Remove a faixa de debug
+  debugShowCheckedModeBanner: false,
 ));
 
-// --- TELA INICIAL (LOGICA DE REDIRECIONAMENTO) ---
+// --- MODELO DE DADOS PARA METAS ---
+class MetaCaminhada {
+  String titulo;
+  int objetivo;
+  int progresso;
+
+  MetaCaminhada({required this.titulo, required this.objetivo, this.progresso = 0});
+
+  Map<String, dynamic> toMap() => {
+    'titulo': titulo,
+    'objetivo': objetivo,
+    'progresso': progresso,
+  };
+
+  factory MetaCaminhada.fromMap(Map<String, dynamic> map) => MetaCaminhada(
+    titulo: map['titulo'],
+    objetivo: map['objetivo'],
+    progresso: map['progresso'],
+  );
+}
+
+// --- TELA INICIAL ---
 class SplashScreen extends StatefulWidget {
   @override
   _SplashScreenState createState() => _SplashScreenState();
@@ -22,97 +43,54 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   _verificarCadastro() async {
-    // Aguarda os dados do SharedPreferences
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? nome = prefs.getString('nome');
-
-    // Verifica se o widget ainda existe na árvore antes de navegar (Boa prática!)
     if (!mounted) return;
-
-    if (nome != null) {
-      Navigator.pushReplacement(
-          context, MaterialPageRoute(builder: (context) => HomeScreen()));
+    if (nome != null && nome.isNotEmpty) {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomeScreen()));
     } else {
-      Navigator.pushReplacement(
-          context, MaterialPageRoute(builder: (context) => CadastroScreen()));
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => CadastroScreen()));
     }
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    body: Center(child: CircularProgressIndicator()),
-  );
+  Widget build(BuildContext context) => Scaffold(body: Center(child: CircularProgressIndicator()));
 }
 
-// --- TELA DE CADASTRO COMPLETA ---
+// --- TELA DE CADASTRO ---
 class CadastroScreen extends StatefulWidget {
   @override
   _CadastroScreenState createState() => _CadastroScreenState();
 }
 
 class _CadastroScreenState extends State<CadastroScreen> {
-  // Controladores para capturar o texto
   final _nomeController = TextEditingController();
   final _idadeController = TextEditingController();
   final _cidadeController = TextEditingController();
-  final _bairroController = TextEditingController();
-
-  // IMPORTANTE: Limpa a memória ao fechar a tela
-  @override
-  void dispose() {
-    _nomeController.dispose();
-    _idadeController.dispose();
-    _cidadeController.dispose();
-    _bairroController.dispose();
-    super.dispose();
-  }
 
   _salvarEEntrar() async {
-    int idade = int.tryParse(_idadeController.text) ?? 0;
-    if (idade < 18) {
-      _aviso("Apenas maiores de 18 anos podem se cadastrar.");
-      return;
-    }
-
+    if (_nomeController.text.isEmpty) return;
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setString('nome', _nomeController.text);
-    await prefs.setInt('idade', idade);
+    await prefs.setInt('idade', int.tryParse(_idadeController.text) ?? 0);
     await prefs.setString('cidade', _cidadeController.text);
-    await prefs.setString('bairro', _bairroController.text);
-
     if (!mounted) return;
-    Navigator.pushReplacement(
-        context, MaterialPageRoute(builder: (context) => HomeScreen()));
-  }
-
-  _aviso(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomeScreen()));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text("Cadastro Inicial")),
-      body: SingleChildScrollView(
+      body: Padding(
         padding: EdgeInsets.all(20),
         child: Column(
           children: [
-            TextField(
-                controller: _nomeController,
-                decoration: InputDecoration(labelText: "Nome Completo")),
-            TextField(
-                controller: _idadeController,
-                decoration: InputDecoration(labelText: "Idade"),
-                keyboardType: TextInputType.number),
-            TextField(
-                controller: _cidadeController,
-                decoration: InputDecoration(labelText: "Cidade")),
-            TextField(
-                controller: _bairroController,
-                decoration: InputDecoration(labelText: "Bairro")),
-            SizedBox(height: 30),
-            ElevatedButton(
-                onPressed: _salvarEEntrar, child: Text("Salvar e Começar"))
+            TextField(controller: _nomeController, decoration: InputDecoration(labelText: "Nome")),
+            TextField(controller: _idadeController, decoration: InputDecoration(labelText: "Idade"), keyboardType: TextInputType.number),
+            TextField(controller: _cidadeController, decoration: InputDecoration(labelText: "Cidade")),
+            SizedBox(height: 20),
+            ElevatedButton(onPressed: _salvarEEntrar, child: Text("Começar"))
           ],
         ),
       ),
@@ -120,104 +98,142 @@ class _CadastroScreenState extends State<CadastroScreen> {
   }
 }
 
-// --- TELA PRINCIPAL (DASHBOARD) ---
+// --- TELA PRINCIPAL ---
 class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text("Saúde Comunitária"),
-        // Removido o botão exit(0) para seguir as boas práticas de UX
-      ),
+      appBar: AppBar(title: Text("Saúde Comunitária")),
       body: ListView(
         children: [
-          _cardClima(),
-          _menuItem(context, "Ver Mapa e Parques", Icons.map, Colors.blue,
-              MapaScreen()),
-          _menuItem(context, "Metas de Caminhada", Icons.flag, Colors.orange,
-              MetasScreen()),
-          _menuItem(context, "Estatísticas (Km)", Icons.bar_chart, Colors.green,
-              EstatisticasScreen()),
-          _menuItem(context, "Ranking de Amigos", Icons.emoji_events,
-              Colors.purple, RankingScreen()),
+          _menuItem(context, "Ver Mapa e Meu Local", Icons.map, Colors.blue, MapaScreen()),
+          _menuItem(context, "Minhas Metas", Icons.flag, Colors.orange, MetasScreen()),
         ],
       ),
     );
   }
 
-  Widget _cardClima() {
-    return Container(
-      margin: EdgeInsets.all(10),
-      padding: EdgeInsets.all(20),
-      decoration: BoxDecoration(
-          color: Colors.blue[50], borderRadius: BorderRadius.circular(15)),
-      child: Row(
-        children: [
-          Icon(Icons.wb_sunny, color: Colors.orange, size: 40),
-          SizedBox(width: 15),
-          Text("Clima em sua região: Ensolarado",
-              style: TextStyle(fontWeight: FontWeight.bold)),
-        ],
-      ),
-    );
-  }
-
-  Widget _menuItem(BuildContext context, String titulo, IconData icone,
-      Color cor, Widget destino) {
+  Widget _menuItem(BuildContext context, String titulo, IconData icone, Color cor, Widget destino) {
     return ListTile(
-      leading:
-      CircleAvatar(backgroundColor: cor, child: Icon(icone, color: Colors.white)),
+      leading: CircleAvatar(backgroundColor: cor, child: Icon(icone, color: Colors.white)),
       title: Text(titulo),
-      trailing: Icon(Icons.arrow_forward_ios, size: 16),
-      onTap: () => Navigator.push(
-          context, MaterialPageRoute(builder: (context) => destino)),
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => destino)),
     );
   }
 }
 
-// --- TELA DE MAPA ---
+// --- TELA DE MAPA (CORRIGIDA) ---
 class MapaScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Mapa e Rotas")),
-      body: Stack(
+      appBar: AppBar(title: Text("Onde estou")),
+      body: GoogleMap(
+        initialCameraPosition: CameraPosition(target: LatLng(-23.5505, -46.6333), zoom: 15),
+        myLocationEnabled: true,
+        myLocationButtonEnabled: true,
+      ),
+    ); // Ponto e vírgula correto aqui
+  }
+}
+
+// --- TELA DE METAS ---
+class MetasScreen extends StatefulWidget {
+  @override
+  _MetasScreenState createState() => _MetasScreenState();
+}
+
+class _MetasScreenState extends State<MetasScreen> {
+  List<MetaCaminhada> listaMetas = [];
+  final _tituloController = TextEditingController();
+  final _objetivoController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarMetas();
+  }
+
+  _carregarMetas() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? metasSalvas = prefs.getString('metas_json');
+    if (metasSalvas != null) {
+      List<dynamic> list = jsonDecode(metasSalvas);
+      setState(() {
+        listaMetas = list.map((m) => MetaCaminhada.fromMap(m)).toList();
+      });
+    }
+  }
+
+  _salvarNoDisco() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String codificado = jsonEncode(listaMetas.map((m) => m.toMap()).toList());
+    await prefs.setString('metas_json', codificado);
+  }
+
+  void _addMeta() {
+    if (_tituloController.text.isEmpty) return;
+    setState(() {
+      listaMetas.add(MetaCaminhada(
+        titulo: _tituloController.text,
+        objetivo: int.tryParse(_objetivoController.text) ?? 5000,
+      ));
+    });
+    _tituloController.clear();
+    _objetivoController.clear();
+    _salvarNoDisco();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text("Metas Ativas")),
+      body: Column(
         children: [
-          Center(
-              child: Text(
-                "O Mapa aparecerá aqui\n(Requer Configuração de API Key)",
-                textAlign: TextAlign.center,
-              )),
-          Positioned(
-            bottom: 20,
-            left: 20,
-            child: FloatingActionButton.extended(
-              onPressed: () {},
-              label: Text("Traçar Rota para Casa"),
-              icon: Icon(Icons.home),
+          Padding(
+            padding: EdgeInsets.all(10),
+            child: Row(
+              children: [
+                Expanded(child: TextField(controller: _tituloController, decoration: InputDecoration(hintText: "Nome da Meta"))),
+                SizedBox(width: 10),
+                Expanded(child: TextField(controller: _objetivoController, decoration: InputDecoration(hintText: "Passos"), keyboardType: TextInputType.number)),
+                IconButton(icon: Icon(Icons.add_box, color: Colors.green), onPressed: _addMeta),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              itemCount: listaMetas.length,
+              itemBuilder: (context, index) {
+                var meta = listaMetas[index];
+                double progressoPercent = (meta.progresso / meta.objetivo).clamp(0.0, 1.0);
+                return Card(
+                  margin: EdgeInsets.all(10),
+                  child: ListTile(
+                    title: Text(meta.titulo),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        LinearProgressIndicator(value: progressoPercent, color: Colors.green),
+                        Text("${meta.progresso} / ${meta.objetivo} passos"),
+                      ],
+                    ),
+                    trailing: IconButton(
+                      icon: Icon(Icons.add_circle, color: Colors.blue),
+                      onPressed: () {
+                        setState(() {
+                          meta.progresso += 500;
+                          _salvarNoDisco();
+                        });
+                      },
+                    ),
+                  ),
+                );
+              },
             ),
           )
         ],
       ),
     );
   }
-}
-
-// --- TELAS PLACEHOLDERS ---
-class MetasScreen extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) =>
-      Scaffold(appBar: AppBar(title: Text("Minhas Metas")));
-}
-
-class EstatisticasScreen extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) =>
-      Scaffold(appBar: AppBar(title: Text("KM Percorridos")));
-}
-
-class RankingScreen extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) =>
-      Scaffold(appBar: AppBar(title: Text("Ranking Comunitário")));
-}
+}q
