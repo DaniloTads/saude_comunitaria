@@ -123,37 +123,67 @@ class HomeScreen extends StatelessWidget {
 }
 
 // --- TELA DE MAPA (CORRIGIDA) ---
-class MapaScreen extends StatelessWidget {
+import 'dart:async';
+import 'package:pedometer/pedometer.dart';
+import 'package:permission_handler/permission_handler.dart';
+
+class MapaScreen extends StatefulWidget {
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text("Onde estou")),
-      body: GoogleMap(
-        initialCameraPosition: CameraPosition(target: LatLng(-23.5505, -46.6333), zoom: 15),
-        myLocationEnabled: true,
-        myLocationButtonEnabled: true,
-      ),
-    ); // Ponto e vírgula correto aqui
-  }
+  _MapaScreenState createState() => _MapaScreenState();
 }
 
-// --- TELA DE METAS ---
-class MetasScreen extends StatefulWidget {
-  @override
-  _MetasScreenState createState() => _MetasScreenState();
-}
-
-class _MetasScreenState extends State<MetasScreen> {
-  List<MetaCaminhada> listaMetas = [];
-  final _tituloController = TextEditingController();
-  final _objetivoController = TextEditingController();
+class _MapaScreenState extends State<MapaScreen> {
+  late Stream<StepCount> _stepCountStream;
+  int _passosHoje = 0;
 
   @override
   void initState() {
     super.initState();
-    _carregarMetas();
+    _iniciarContagem();
   }
 
+  void _iniciarContagem() async {
+    // Pede permissão para usar o sensor
+    if (await Permission.activityRecognition.request().isGranted) {
+      _stepCountStream = Pedometer.stepCountStream;
+      _stepCountStream.listen((event) async {
+        int calculo = await ContadorPassosService.calcularPassosDiarios(event.steps);
+        setState(() => _passosHoje = calculo);
+      }).onError((error) => print("Erro no sensor: $error"));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text("Caminhada Ativa")),
+      body: Stack(
+        children: [
+          GoogleMap(
+            initialCameraPosition: CameraPosition(target: LatLng(-23.5505, -46.6333), zoom: 15),
+            myLocationEnabled: true,
+            myLocationButtonEnabled: true,
+          ),
+          // Painel flutuante de passos
+          Positioned(
+            top: 15, left: 15, right: 15,
+            child: Container(
+              padding: EdgeInsets.all(15),
+              decoration: BoxDecoration(color: Colors.white.withOpacity(0.9), borderRadius: BorderRadius.circular(10)),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text("Passos Hoje:", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  Text("$_passosHoje", style: TextStyle(fontSize: 22, color: Colors.blue, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
   _carregarMetas() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? metasSalvas = prefs.getString('metas_json');
@@ -236,4 +266,53 @@ class _MetasScreenState extends State<MetasScreen> {
       ),
     );
   }
-}q
+}
+// --- NOVO: SERVIÇO DE ALERTAS DE SAÚDE ---
+class AlertaSaudeService {
+  static Timer? _timerAgua;
+
+  // Inicia lembrete de água a cada 'x' minutos
+  static void iniciarLembreteAgua(BuildContext context, int minutos) {
+    _timerAgua?.cancel();
+    _timerAgua = Timer.periodic(Duration(minutes: minutos), (timer) {
+      _mostrarAlerta(context, "Hidratação!", "Está na hora de beber água para manter o ritmo!");
+    });
+  }
+
+  static void avisarFruta(BuildContext context, String momento) {
+    // momento pode ser "Durante o treino" ou "Pós-treino"
+    _mostrarAlerta(context, "Nutrição $momento", "Não esqueça de comer uma fruta para repor as energias!");
+  }
+
+  static void _mostrarAlerta(BuildContext context, String titulo, String msg) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(titulo, style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+        content: Text(msg),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text("OK"))],
+      ),
+    );
+  }
+}
+class ContadorPassosService {
+  static const String KEY_PASSOS_INICIAIS = "passos_dispositivo_total";
+  static const String KEY_DATA_HOJE = "data_atual";
+
+  // Calcula quantos passos foram dados HOJE subtraindo o total do sensor pelo total do início do dia
+  static Future<int> calcularPassosDiarios(int passosTotaisSensor) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String hoje = DateTime.now().toString().split(' ')[0];
+    String? ultimaData = prefs.getString(KEY_DATA_HOJE);
+
+    if (ultimaData != hoje) {
+      // Novo dia detectado: salva o valor atual do sensor como "ponto zero"
+      await prefs.setString(KEY_DATA_HOJE, hoje);
+      await prefs.setInt(KEY_PASSOS_INICIAIS, passosTotaisSensor);
+      return 0;
+    }
+
+    int pontoZero = prefs.getInt(KEY_PASSOS_INICIAIS) ?? passosTotaisSensor;
+    return passosTotaisSensor - pontoZero;
+  }
+}
